@@ -46,14 +46,14 @@ class Rectangle(Shape):
 
     @staticmethod
     def formula():
-        return "Area = length × width, Perimeter = 2(length + width)"
+        return "Area = length x width, Perimeter = 2(length + width)"
 class Square(Rectangle):
     def __init__(self, side):
         super().__init__(side, side)
 
     @staticmethod
     def formula():
-        return "Area = side², Perimeter = 4 × side"
+        return "Area = side², Perimeter = 4 x side"
 class Triangle(Shape):
     def __init__(self, a, b, c):
         if a <= 0 or b <= 0 or c <= 0:
@@ -71,7 +71,6 @@ class Triangle(Shape):
         s = self.perimeter() / 2
         return math.sqrt(s * (s - self.a) * (s - self.b) * (s - self.c))
 
-    @staticmethod
     def formula():
         return "Area = √(s(s-a)(s-b)(s-c)), Perimeter = a + b + c"
 def get_positive_float(prompt):
