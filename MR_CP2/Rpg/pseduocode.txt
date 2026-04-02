@@ -1,0 +1,103 @@
+# Helper.py
+
+Import required libraries: pandas, matplotlib, faker, random
+
+Class Character:
+    Attributes: name, type, attributes list [STR, INT, SPD, HP], skin, eyes, height, hunter
+    Method to_dict() -> returns dictionary for DataFrame/CSV
+    Method display_stats() -> prints formatted stats
+
+Class RandomGenerator:
+    List of valid eye colors
+    Method generate_character_template():
+        - Use Faker to generate name
+        - Choose random type
+        - Generate random attributes (STR, INT, SPD, HP)
+        - Generate random skin color, eyes, height, hunter
+        - Return Character instance
+    Method generate_backstory():
+        - Use Faker and random to create descriptive backstory string
+
+Class DataVisualization:
+    Method radar_chart(character):
+        - Use matplotlib polar chart to display STR, INT, SPD, HP
+    Method bar_chart(character):
+        - Use matplotlib bar chart to display stats
+
+Class StatisticalAnalyzer:
+    Constructor takes list of Character instances
+    Convert characters to pandas DataFrame
+    Method summary_stats():
+        - Calculate mean, median, max, min for each attribute
+    Method top_attribute(attr, top_n):
+        - Return top N characters by selected attribute
+    Method attribute_distribution(attr):
+        - Plot histogram for selected attribute
+
+Class CSVManager:
+    Static method save_characters_to_csv(characters, filename)
+        - Convert list of characters to DataFrame and save as CSV
+    Static method load_characters_from_csv(filename)
+        - Read CSV into DataFrame and return list of Character instances
+
+# main.py
+
+Import Helper.py classes
+
+Load characters from Character.csv using CSVManager
+
+While True (Main Menu):
+    Display menu options:
+        1. Create new character
+        2. View character stats
+        3. Visualize character stats
+        4. Statistical analysis
+        5. Save all characters
+        6. Load characters
+        7. Quit
+
+    Get user input (number or command)
+
+    If input == 1:
+        Use RandomGenerator.generate_character_template() or manual input
+        Append character to character list
+        Display backstory using RandomGenerator.generate_backstory()
+    
+    If input == 2:
+        List all characters
+        User selects one
+        Call display_stats() on chosen character
+
+    If input == 3:
+        List all characters
+        User selects one
+        Ask for chart type (radar or bar)
+        Call appropriate DataVisualization method
+
+    If input == 4:
+        Create StatisticalAnalyzer instance with character list
+        Show summary stats, top attribute, or attribute distribution
+        Ask user which metric to show
+
+    If input == 5:
+        Call CSVManager.save_characters_to_csv() to save Character.csv
+
+    If input == 6:
+        Call CSVManager.load_characters_from_csv()
+        Replace current character list
+
+    If input == 7:
+        Exit program
+
+
+Name,Type,STR,INT,SPD,HP,Skin,Eyes,Height,Hunter
+John Doe,Human,12,14,10,20,Fair,Brown,180cm,Yes
+
+main.py --> displays menu --> calls Helper.py classes
+Helper.py:
+    Character --> stores data
+    RandomGenerator --> generates characters
+    DataVisualization --> plots stats
+    StatisticalAnalyzer --> computes stats
+    CSVManager --> saves/loads CSV
+Character.csv --> persistent character storage
