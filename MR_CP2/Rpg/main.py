@@ -5,7 +5,7 @@ characters = CSVManager.LoadCharToCSV()
 
 def main_menu():
     while True:
-        print("\n=== TERMINAL RPG MANAGER ===")
+        print("\nRPG MANAGER")
         print("1. Create new character")
         print("2. View character stats")
         print("3. Visualize character stats")

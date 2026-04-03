@@ -1,196 +1,179 @@
 from direct.showbase.ShowBase import ShowBase
-from panda3d.core import (
-    Vec3, WindowProperties,
-    CollisionTraverser, CollisionNode, CollisionRay,
-    CollisionHandlerQueue, BitMask32
-)
+from panda3d.core import Vec3, WindowProperties, CollisionTraverser, CollisionNode, CollisionSphere, CollisionHandlerPusher, CollisionRay, CollisionHandlerQueue, BitMask32
 from direct.task import Task
 
 # --- CONFIG ---
 BLOCK_SIZE = 1
 WORLD_SIZE = 16
-GROUND_HEIGHT = 4
-
+PLAYER_HEIGHT = 2
+GRAVITY = -9.8
+JUMP_SPEED = 5
+MOVEMENT_SPEED = 5
 
 class MiniMinecraft(ShowBase):
     def __init__(self):
         super().__init__()
         self.disableMouse()
 
-        # --- Camera ---
-        self.camera.setPos(WORLD_SIZE / 2, -WORLD_SIZE * 1.5, GROUND_HEIGHT + 2)
+        # --- FPS Camera Setup ---
+        self.camera.setPos(WORLD_SIZE/2, -WORLD_SIZE*1.5, PLAYER_HEIGHT + 5)
         self.pitch = 0
         self.yaw = 0
         self.sensitivity = 0.2
 
-        # --- Mouse ---
-        props = WindowProperties()
-        props.setCursorHidden(True)
-        props.setMouseMode(WindowProperties.M_relative)
-        self.win.requestProperties(props)
+        # Hide & lock cursor
+        self.props = WindowProperties()
+        self.props.setCursorHidden(True)
+        self.props.setMouseMode(WindowProperties.M_confined)
+        self.win.requestProperties(self.props)
+        self.mouse_locked = True
 
-        # --- Load Model ---
+        # --- Load Block Model & Textures ---
         self.block_model = self.loader.loadModel("models/box")
+        # fallback color if texture missing
+        self.block_model.setColor(0.5,0.5,0.5,1)
 
-        # --- COLORS instead of textures ---
-        self.colors = {
-            "grass": (0.2, 0.8, 0.2, 1),
-            "dirt": (0.5, 0.3, 0.1, 1),
-            "stone": (0.5, 0.5, 0.5, 1)
-        }
-
-        self.blocks = {}
+        self.blocks = {}  # dict for blocks
 
         # --- Generate Flat Terrain ---
         self.generate_terrain()
 
-        # --- Input ---
+        # --- Key Handling ---
         self.keys = {}
-        for key in ["w", "a", "s", "d", "space", "shift"]:
+        for key in ["w","a","s","d","space","shift","escape"]:
             self.accept(key, self.set_key, [key, True])
             self.accept(f"{key}-up", self.set_key, [key, False])
+        for i in range(1,10):
+            self.accept(str(i), self.set_key, ["block"+str(i), True])
 
-        self.accept("mouse1", self.break_block)
-        self.accept("mouse3", self.place_block)
-
-        # --- Tasks ---
-        self.taskMgr.add(self.update_movement, "movement")
-        self.taskMgr.add(self.update_mouse, "mouse")
-
-        # --- Raycasting ---
+        # --- Player Collision ---
         self.cTrav = CollisionTraverser()
-        self.ray = CollisionRay()
+        self.pusher = CollisionHandlerPusher()
+        self.playerCollider = self.camera.attachNewNode(CollisionNode('player'))
+        self.playerCollider.node().addSolid(CollisionSphere(0,0,PLAYER_HEIGHT/2,PLAYER_HEIGHT/2))
+        self.playerCollider.node().setFromCollideMask(BitMask32.bit(1))
+        self.playerCollider.node().setIntoCollideMask(BitMask32.allOff())
+        self.cTrav.addCollider(self.playerCollider, self.pusher)
+        self.pusher.addCollider(self.playerCollider, self.camera)
 
+        # --- Ray for Block Picking ---
+        self.ray = CollisionRay()
         self.rayNode = CollisionNode("ray")
         self.rayNode.addSolid(self.ray)
         self.rayNode.setFromCollideMask(BitMask32.bit(1))
+        self.rayNode.setIntoCollideMask(BitMask32.allOff())
         self.rayNP = self.camera.attachNewNode(self.rayNode)
-
         self.rayHandler = CollisionHandlerQueue()
         self.cTrav.addCollider(self.rayNP, self.rayHandler)
 
-    # --- Input ---
+        # --- Movement & Gravity ---
+        self.velocity = Vec3(0,0,0)
+        self.is_jumping = False
+
+        self.taskMgr.add(self.update, "update")
+
+        # --- Mouse Click Events ---
+        self.accept("mouse1", self.break_block)
+        self.accept("mouse3", self.place_block)
+
+    # --- Key Handling ---
     def set_key(self, key, value):
         self.keys[key] = value
+        if key == "escape" and value:
+            self.mouse_locked = not self.mouse_locked
+            props = WindowProperties()
+            props.setCursorHidden(not self.mouse_locked)
+            props.setMouseMode(WindowProperties.M_confined if self.mouse_locked else WindowProperties.M_absolute)
+            self.win.requestProperties(props)
 
     # --- Terrain ---
     def generate_terrain(self):
         for x in range(WORLD_SIZE):
             for y in range(WORLD_SIZE):
-                for z in range(GROUND_HEIGHT):
-                    if z == GROUND_HEIGHT - 1:
-                        block_type = "grass"
-                    elif z > GROUND_HEIGHT - 4:
-                        block_type = "dirt"
-                    else:
-                        block_type = "stone"
+                height = 3
+                for z in range(height):
+                    self.create_block(x, y, z, "grass" if z==height-1 else "dirt")
 
-                    self.create_block(x, y, z, block_type)
-
-    # --- Blocks ---
-    def create_block(self, x, y, z, block_type="grass"):
-        if (x, y, z) in self.blocks:
-            return
-
+    def create_block(self, x, y, z, texture="grass"):
         block = self.block_model.copyTo(self.render)
-        block.setPos(x * BLOCK_SIZE, y * BLOCK_SIZE, z * BLOCK_SIZE)
+        block.setPos(x*BLOCK_SIZE, y*BLOCK_SIZE, z*BLOCK_SIZE)
         block.setScale(BLOCK_SIZE)
-
-        # Use color instead of texture
-        block.setColor(self.colors[block_type])
-
         block.setCollideMask(BitMask32.bit(1))
-        self.blocks[(x, y, z)] = block
+        self.blocks[(x,y,z)] = block
 
     def remove_block(self, x, y, z):
-        block = self.blocks.pop((x, y, z), None)
+        block = self.blocks.pop((x,y,z), None)
         if block:
             block.removeNode()
 
     # --- Raycast ---
-    def get_target_block(self):
+    def get_target(self):
         self.ray.setOrigin(self.camera.getPos(self.render))
         self.ray.setDirection(self.camera.getQuat(self.render).getForward())
-
         self.cTrav.traverse(self.render)
-
         if self.rayHandler.getNumEntries() > 0:
             self.rayHandler.sortEntries()
             entry = self.rayHandler.getEntry(0)
-
-            node = entry.getIntoNodePath()
-            pos = node.getNetPos(self.render)
+            pos = entry.getIntoNodePath().getPos(self.render)
             normal = entry.getSurfaceNormal(self.render)
-
-            block_pos = tuple(int(round(coord)) for coord in pos)
-            place_pos = tuple(int(round(coord)) for coord in (pos + normal * 0.5))
-
-            return block_pos, place_pos
-
+            block = tuple(int(round(c)) for c in pos)
+            place = tuple(int(round(c)) for c in (pos + normal*0.5))
+            return block, place
         return None, None
 
-    # --- Actions ---
     def break_block(self):
-        block_pos, _ = self.get_target_block()
-        if block_pos:
-            self.remove_block(*block_pos)
+        block, _ = self.get_target()
+        if block:
+            self.remove_block(*block)
 
     def place_block(self):
-        _, place_pos = self.get_target_block()
-        if place_pos:
-            if place_pos not in self.blocks:
-                self.create_block(*place_pos, "dirt")
+        _, place = self.get_target()
+        if place:
+            self.create_block(*place)
 
-    # --- Movement ---
-    def update_movement(self, task):
+    # --- Update ---
+    def update(self, task):
         dt = globalClock.getDt()
-        speed = 5 * dt
-
-        forward = self.camera.getQuat().getForward()
-        right = self.camera.getQuat().getRight()
-
-        forward.setZ(0)
-        right.setZ(0)
-        forward.normalize()
-        right.normalize()
-
-        if self.keys.get("w"):
-            self.camera.setPos(self.camera.getPos() + forward * speed)
-        if self.keys.get("s"):
-            self.camera.setPos(self.camera.getPos() - forward * speed)
-        if self.keys.get("a"):
-            self.camera.setPos(self.camera.getPos() - right * speed)
-        if self.keys.get("d"):
-            self.camera.setPos(self.camera.getPos() + right * speed)
-        if self.keys.get("space"):
-            self.camera.setZ(self.camera.getZ() + speed)
-        if self.keys.get("shift"):
-            self.camera.setZ(self.camera.getZ() - speed)
-
+        self.update_mouse()
+        self.update_movement(dt)
         return Task.cont
 
-    # --- Mouse Look ---
-    def update_mouse(self, task):
-        if self.mouseWatcherNode.hasMouse():
-            md = self.win.getPointer(0)
+    def update_movement(self, dt):
+        direction = Vec3(0,0,0)
+        if self.keys.get("w"): direction += Vec3(0,1,0)
+        if self.keys.get("s"): direction += Vec3(0,-1,0)
+        if self.keys.get("a"): direction += Vec3(-1,0,0)
+        if self.keys.get("d"): direction += Vec3(1,0,0)
 
-            x = md.getX() - self.win.getXSize() // 2
-            y = md.getY() - self.win.getYSize() // 2
+        direction.normalize()
+        direction *= MOVEMENT_SPEED * dt
 
+        # Apply horizontal movement
+        self.camera.setPos(self.camera, direction)
+
+        # Gravity
+        self.velocity.z += GRAVITY * dt
+
+        # Jump
+        if self.keys.get("space") and not self.is_jumping:
+            self.velocity.z = JUMP_SPEED
+            self.is_jumping = True
+
+        # Move vertically
+        self.camera.setZ(self.camera.getZ() + self.velocity.z * dt)
+
+    def update_mouse(self):
+        if self.mouse_locked and self.mouseWatcherNode.hasMouse():
+            x = self.mouseWatcherNode.getMouseX()
+            y = self.mouseWatcherNode.getMouseY()
             self.yaw -= x * self.sensitivity
             self.pitch -= y * self.sensitivity
             self.pitch = max(-90, min(90, self.pitch))
-
             self.camera.setHpr(self.yaw, self.pitch, 0)
-
-            self.win.movePointer(
-                0,
-                self.win.getXSize() // 2,
-                self.win.getYSize() // 2
-            )
-
-        return Task.cont
-
+            # Reset mouse to center
+            self.win.movePointer(0,
+                                 int(self.win.getProperties().getXSize()/2),
+                                 int(self.win.getProperties().getYSize()/2))
 
 # --- Run ---
 app = MiniMinecraft()
