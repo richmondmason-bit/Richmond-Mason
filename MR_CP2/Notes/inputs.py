@@ -1,13 +1,13 @@
-#MR 1st Inputs and Outputs Notes
+import tkinter as tk
+root = tk.Tk()
+root.title("My Python GUI")
+root.geometry("300x200")
 
-#5 What is an input
-#A way for the code to get info
-name = input("instructions for your user")
-name = input("what is your name?")
-print("hello!",name)
 
-#save the point where it can ve accessed again 
-#Use key word "input"
-#Inside parens give user instructions
 
-#both instruction methods work, but you have to do it the same
+
+label = tk.Label(root, text="Hello, Tkinter!")
+
+
+label.pack(pady=20)
+root.mainloop()

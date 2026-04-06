@@ -1,89 +1,58 @@
 # main.py
-from Helper import RandomGenerator, DataVisualization, StatisticalAnalyzer, CSVManager
-import pandas
-characters = CSVManager.LoadCharToCSV()
+from helper import Character, RandomGenerator, DataVisualization, StatisticalAnalyzer, CSVManager
 
-def main_menu():
+def main():
+    characters = CSVManager.load_from_csv()
+    generator = RandomGenerator()
+    visualizer = DataVisualization()
+
     while True:
-        print("\nRPG MANAGER")
-        print("1. Create new character")
-        print("2. View character stats")
-        print("3. Visualize character stats")
-        print("4. Statistical analysis")
-        print("5. Save all characters")
-        print("6. Load characters")
-        print("7. Quit")
+        print("\n--- Character Management ---")
+        print("1. Create Random Character")
+        print("2. Show All Characters")
+        print("3. Visualize Character Stats")
+        print("4. Show Statistical Summary")
+        print("5. Save & Exit")
+        choice = input("Select an option: ")
 
-        choice = input("Select an option: ").strip()
         if choice == "1":
-            c = RandomGenerator.GenerateCharacter()
-            print("\nGenerated Character:")
-            c.display_stats()
-            print("\nBackstory:")
-            print(RandomGenerator.GenerateBackstory(c))
-            characters.append(c)
-
+            char = generator.generate_character()
+            characters.append(char)
+            print(f"Created character: {char.name}")
         elif choice == "2":
             if not characters:
-                print("No characters available.")
+                print("No characters yet.")
                 continue
-            for i, c in enumerate(characters):
-                print(f"{i+1}. {c.name} ({c.type})")
-            idx = input("Select character: ")
-            if idx.isdigit() and 1 <= int(idx) <= len(characters):
-                characters[int(idx)-1].display_stats()
-            else:
-                print("Invalid selection.")
-
+            for i, c in enumerate(characters, start=1):
+                print(f"{i}. {c.name} | Level {c.level} | Stats: {c.stats}")
         elif choice == "3":
             if not characters:
-                print("No characters available.")
+                print("No characters to visualize.")
                 continue
-            for i, c in enumerate(characters):
-                print(f"{i+1}. {c.name} ({c.type})")
-            idx = input("Select character: ")
-            if idx.isdigit() and 1 <= int(idx) <= len(characters):
-                chart_type = input("Chart type (radar/bar): ").lower()
-                if chart_type == "radar":
-                    DataVisualization.radar_chart(characters[int(idx)-1])
+            for i, c in enumerate(characters, start=1):
+                print(f"{i}. {c.name}")
+            try:
+                idx = int(input("Select a character number: ")) - 1
+                if 0 <= idx < len(characters):
+                    visualizer.plot_bar_stats(characters[idx])
+                    visualizer.plot_radar_chart(characters[idx])
                 else:
-                    DataVisualization.bar_chart(characters[int(idx)-1])
-            else:
-                print("Invalid selection.")
-
+                    print("Invalid selection.")
+            except ValueError:
+                print("Please enter a number.")
         elif choice == "4":
             if not characters:
-                print("No characters available.")
+                print("No characters to analyze.")
                 continue
             analyzer = StatisticalAnalyzer(characters)
-            print("1. Summary stats")
-            print("2. Top attribute")
-            print("3. Attribute distribution")
-            sub_choice = input("Select analysis: ")
-            if sub_choice == "1":
-                analyzer.summary_stats()
-            elif sub_choice == "2":
-                attr = input("Attribute (STR/INT/SPD/HP): ").upper()
-                analyzer.top_attribute(attr)
-            elif sub_choice == "3":
-                attr = input("Attribute (STR/INT/SPD/HP): ").upper()
-                analyzer.attribute_distribution(attr)
-            else:
-                print("Invalid option.")
-
+            print(analyzer.summary_stats())
         elif choice == "5":
-            CSVManager.SaveCharToCSV(characters)
-
-        elif choice == "6":
-            characters[:] = CSVManager.LoadCharToCSV()
-            print(f"Loaded {len(characters)} characters.")
-
-        elif choice == "7":
-            print("Exiting...")
+            CSVManager.save_to_csv(characters)
+            print("Characters saved to Character.csv. Goodbye!")
             break
-
         else:
             print("Invalid option. Try again.")
 
+
 if __name__ == "__main__":
-    main_menu()
+    main()

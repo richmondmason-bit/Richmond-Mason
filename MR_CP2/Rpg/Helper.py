@@ -1,142 +1,105 @@
-# Helper.py
+# helper.py
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 from faker import Faker
 import random
+import os
 
 fake = Faker()
 
-class Character:
-    VALID_EYE_COLORS = ["Blue", "Brown", "Green", "Hazel", "Gray", "Amber"]
+# Character Class
 
-    def __init__(self, name, type_, STR, INT, SPD, HP, skin, eyes, height, hunter):
+class Character:
+    def __init__(self, name, level=1, stats=None, backstory=None):
         self.name = name
-        self.type = type_
-        self.attributes = {"STR": STR, "INT": INT, "SPD": SPD, "HP": HP}
-        self.skin = skin
-        self.eyes = eyes if eyes in self.VALID_EYE_COLORS else "Brown"
-        self.height = height
-        self.hunter = hunter
+        self.level = level
+        self.stats = stats or {"strength": 5, "dexterity": 5, "intelligence": 5}
+        self.backstory = backstory
 
     def to_dict(self):
-        return {
-            "Name": self.name,
-            "Type": self.type,
-            **self.attributes,
-            "Skin": self.skin,
-            "Eyes": self.eyes,
-            "Height": self.height,
-            "Hunter": self.hunter
-        }
+        return {"name": self.name, "level": self.level, **self.stats, "backstory": self.backstory}
 
-    def display_stats(self):
-        print(f"{self.name} ({self.type})")
-        for attr, val in self.attributes.items():
-            print(f"{attr}: {val}")
-        print(f"Skin: {self.skin} | Eyes: {self.eyes} | Height: {self.height} | Hunter: {self.hunter}")
 
+
+# Random Generator
 
 class RandomGenerator:
-    TYPES = ["Human", "Dog", "Goblin", "Bear"]
-    SKINS = ["Fair", "Tan", "Dark", "Green", "Blue"]
+    def generate_name(self):
+        return fake.name()
 
-    @staticmethod
-    def GenerateCharacter():
-        name = fake.name()
-        type_ = random.choice(RandomGenerator.TYPES)
-        STR = random.randint(5, 20)
-        INT = random.randint(5, 20)
-        SPD = random.randint(5, 20)
-        HP = random.randint(10, 30)
-        skin = random.choice(RandomGenerator.SKINS)
-        eyes = random.choice(Character.VALID_EYE_COLORS)
-        height = f"{random.randint(140, 210)}cm"
-        hunter = random.choice(["Yes", "No"])
-        return Character(name, type_, STR, INT, SPD, HP, skin, eyes, height, hunter)
+    def generate_backstory(self):
+        return fake.sentence(nb_words=15)
 
-    @staticmethod
-    def GenerateBackstory(character: Character):
-        traits = ["brilliant","reckless","charming","cold","empathetic","manipulative","loyal","ambitious"]
-        hobbies = ["hiking","reading","coding","traveling","painting","gaming","cooking"]
-        past_events = ["survived a near-fatal accident","won a prestigious award","lost someone important"]
-        goals = ["seeking revenge","trying to find purpose","hiding a dangerous secret"]
-        secrets = ["they are not who they claim to be","they are being watched","their past identity was erased"]
-        return (
-            f"{character.name}, a {character.type}, is {random.choice(traits)}. "
-            f"Enjoys {random.choice(hobbies)}. "
-            f"Previously, {random.choice(past_events)}. "
-            f"Currently, {random.choice(goals)}. Secretly, {random.choice(secrets)}."
+    def generate_stats(self):
+        return {k: random.randint(1, 20) for k in ["strength", "dexterity", "intelligence"]}
+
+    def generate_character(self):
+        return Character(
+            self.generate_name(),
+            stats=self.generate_stats(),
+            backstory=self.generate_backstory()
         )
 
+
+# Data Visualization
+
 class DataVisualization:
-    @staticmethod
-    def radar_chart(character: Character):
-        stats = character.attributes
-        labels = list(stats.keys())
-        values = list(stats.values())
-        values += values[:1]  # Close the loop
-        angles = [n / float(len(labels)) * 2 * 3.14159 for n in range(len(labels))]
-        angles += angles[:1]
-
-        plt.figure(figsize=(6,6))
-        ax = plt.subplot(111, polar=True)
-        ax.plot(angles, values, 'o-', linewidth=2)
-        ax.fill(angles, values, alpha=0.25)
-        ax.set_xticks(angles[:-1])
-        ax.set_xticklabels(labels)
-        plt.title(f"{character.name}'s Stats")
-        plt.show()
-
-    @staticmethod
-    def bar_chart(character: Character):
-        stats = character.attributes
-        plt.figure(figsize=(6,4))
+    def plot_bar_stats(self, character):
+        stats = character.stats
         plt.bar(stats.keys(), stats.values(), color='skyblue')
         plt.title(f"{character.name}'s Stats")
-        plt.ylabel("Value")
+        plt.ylabel('Value')
         plt.show()
+
+    def plot_radar_chart(self, character):
+        labels = list(character.stats.keys())
+        values = list(character.stats.values())
+        angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
+        values += values[:1]
+        angles += angles[:1]
+
+        fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+        ax.plot(angles, values, 'o-', linewidth=2)
+        ax.fill(angles, values, alpha=0.25)
+        ax.set_thetagrids(np.degrees(angles), labels)
+        plt.title(f"{character.name} Radar Chart")
+        plt.show()
+
+
+
+# Statistical Analyzer
 
 class StatisticalAnalyzer:
     def __init__(self, characters):
-        self.characters = characters
         self.df = pd.DataFrame([c.to_dict() for c in characters])
 
     def summary_stats(self):
-        print("=== Summary Statistics ===")
-        print(self.df[["STR","INT","SPD","HP"]].describe())
+        numeric_cols = self.df.select_dtypes(include='number').columns
+        return self.df[numeric_cols].describe()
 
-    def top_attribute(self, attr, top_n=3):
-        print(f"=== Top {top_n} Characters by {attr} ===")
-        top = self.df.sort_values(by=attr, ascending=False).head(top_n)
-        print(top[["Name","Type",attr]])
+    def filter_by_stat(self, stat, min_val):
+        return self.df[self.df[stat] >= min_val]
 
-    def attribute_distribution(self, attr):
-        plt.figure(figsize=(6,4))
-        self.df[attr].hist(color='lightgreen')
-        plt.title(f"Distribution of {attr}")
-        plt.xlabel(attr)
-        plt.ylabel("Frequency")
-        plt.show()
 
+
+# Data Manager
 
 class CSVManager:
-    @staticmethod
-    def SaveCharToCSV(characters, filename="MR_CP2\Rpg\Character.csv"):
-        df = pd.DataFrame([c.to_dict() for c in characters])
-        df.to_csv(filename, index=False)
-        print(f"Saved {len(characters)} characters to {filename}")
+    CSV_FILE = "MR_CP2\Rpg\Character.csv"
 
     @staticmethod
-    def LoadCharToCSV(filename="MR_CP2\Rpg\Character.csv"):
+    def save_to_csv(characters):
+        df = pd.DataFrame([c.to_dict() for c in characters])
+        df.to_csv(CSVManager.CSV_FILE, index=False)
+
+    @staticmethod
+    def load_from_csv():
+        if not os.path.exists(CSVManager.CSV_FILE) or os.path.getsize(CSVManager.CSV_FILE) == 0:
+            return []
+        df = pd.read_csv(CSVManager.CSV_FILE)
         characters = []
-        try:
-            df = pd.read_csv(filename)
-            for _, row in df.iterrows():
-                c = Character(
-                    row["Name"], row["Type"], row["STR"], row["INT"], row["SPD"], row["HP"],
-                    row["Skin"], row["Eyes"], row["Height"], row["Hunter"]
-                )
-                characters.append(c)
-        except FileNotFoundError:
-            print(f"No CSV file found: {filename}")
+        for _, row in df.iterrows():
+            stats = {k: row[k] for k in ["strength", "dexterity", "intelligence"] if k in row}
+            characters.append(Character(row['name'], row['level'], stats, row.get('backstory')))
         return characters
