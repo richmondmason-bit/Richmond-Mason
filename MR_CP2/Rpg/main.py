@@ -1,6 +1,6 @@
 # main.py
 from Helper import RandomGenerator, DataVisualization, StatisticalAnalyzer, CSVManager
-
+import pandas
 characters = CSVManager.LoadCharToCSV()
 
 def main_menu():
