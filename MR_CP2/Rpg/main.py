@@ -7,7 +7,7 @@ def main():
     visualizer = DataVisualization()
 
     while True:
-        print("\n_Character Management_")
+        print("\nCharacter Management")
         print("1. Create Random Character")
         print("2. Show All Characters")
         print("3. Visualize Character Stats")
